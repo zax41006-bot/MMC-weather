@@ -12,6 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 # 🌟 新增：如果卡住超過 10 分鐘就自動放棄，避免浪費額度
 
     steps:
       - name: 檢出代碼 (Checkout)
@@ -40,6 +41,8 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "GitHub Actions Bot"
+          # 先拉取最新代碼，防止衝突
+          git pull origin main
           git add weather.png
-          # 如果圖片有變動才 commit，避免報錯
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image" && git push)
+          # 加上 [skip ci] 避免觸發其他 Workflow
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]" && git push)
