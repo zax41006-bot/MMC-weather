@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # 讓你能在網頁上手動點擊測試
 
 permissions:
-  contents: write # 允許把生成的圖片寫回倉庫
+  contents: write
 
 jobs:
   build:
@@ -30,7 +30,8 @@ jobs:
       - name: 安裝 Python 依賴套件
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # 使用清華鏡像源加速並防止超時
+          pip install -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple/
 
       - name: 執行 real-time.py 生成天氣圖片
         run: python real-time.py
@@ -40,4 +41,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "GitHub Actions Bot"
           git add weather.png
+          # 如果圖片有變動才 commit，避免報錯
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image" && git push)
