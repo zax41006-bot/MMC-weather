@@ -6,12 +6,14 @@ import matplotlib.patches as patches
 from matplotlib import font_manager
 import io
 import time
+import os  # 🌟 新增：用來檢查檔案是否存在
 
 # ==========================================
 # 設定常數
 # ==========================================
 XML_URL = "https://xml.smg.gov.mo/c_actual_brief.xml"
 OUTPUT_FILENAME = "weather.png"
+LAST_TIME_FILE = "last_valid_for.txt"  # 🌟 新增：記錄上次更新的時間備忘錄
 MAX_RETRIES = 3
 RETRY_DELAY = 3  # 秒
 
@@ -56,6 +58,7 @@ def parse_weather_data(xml_text):
         formatted_time = raw_time if raw_time else "未知時間"
 
     return {
+        "raw_valid_for": raw_time,  # 🌟 保留原始時間字串用於比對
         "time": formatted_time, 
         "temp": temp, 
         "feels_like": feels_like_desc,
@@ -151,9 +154,30 @@ if __name__ == "__main__":
         print("開始獲取天氣數據...")
         xml_data = fetch_xml_data()
         weather_info = parse_weather_data(xml_data)
+        
+        current_valid_for = weather_info["raw_valid_for"]
+        print(f"氣象局最新有效時間：{current_valid_for}")
+
+        # 🌟 檢查備忘錄，如果時間沒變，直接跳過
+        last_valid_for = ""
+        if os.path.exists(LAST_TIME_FILE):
+            with open(LAST_TIME_FILE, "r", encoding="utf-8") as f:
+                last_valid_for = f.read().strip()
+
+        if current_valid_for == last_valid_for and current_valid_for != "":
+            print("⏭️ 氣象局時間未更新，跳過畫圖。")
+            exit(0)
+
+        # 時間有變（或第一次執行），開始畫圖
+        print("🔄 偵測到新時間，開始生成圖片...")
+        generate_image(weather_info)
+        
+        # 將最新的時間寫入備忘錄檔案
+        with open(LAST_TIME_FILE, "w", encoding="utf-8") as f:
+            f.write(current_valid_for)
+            
         print(f"解析結果：時間 {weather_info['time']}, 氣溫 {weather_info['temp']}°C")
         
-        generate_image(weather_info)
     except Exception as e:
         print(f"❌ 程式執行失敗: {e}")
         exit(1)
