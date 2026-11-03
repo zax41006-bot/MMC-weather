@@ -2,7 +2,7 @@ name: Update MMC Weather Image
 
 on:
   schedule:
-    # 🌟 改為每 15 分鐘執行一次 (避開整點高峰，也解決 GitHub 定時器延遲問題)
+    # 每 15 分鐘檢查一次
     - cron: '*/15 * * * *'
   workflow_dispatch: # 讓你能在網頁上手動點擊測試
 
@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10 # 如果卡住超過 10 分鐘就自動放棄，避免浪費額度
+    timeout-minutes: 10
 
     steps:
       - name: 檢出代碼 (Checkout)
@@ -31,7 +31,6 @@ jobs:
       - name: 安裝 Python 依賴套件
         run: |
           python -m pip install --upgrade pip
-          # 使用清華鏡像源加速並防止超時
           pip install -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple/
 
       - name: 執行 real-time.py 生成天氣圖片
@@ -41,11 +40,10 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "GitHub Actions Bot"
-          # 先拉取最新代碼，防止衝突
           git pull origin main
           
-          # 🌟 關鍵修改：把圖片和記錄時間的備忘錄一起加入提交
-          git add weather.png last_valid_for.txt
+          # 只把圖片加入
+          git add weather.png
           
-          # 加上 [skip ci] 避免觸發其他 Workflow
+          # 🌟 關鍵：Git 會自動比對。如果圖片一模一樣，這行就不會 Commit；如果圖片變了，才會 Commit
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]" && git push)
