@@ -1,10 +1,8 @@
 name: Update MMC Weather Image
 
 on:
-  schedule:
-    # 每 15 分鐘檢查一次
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # 讓你能在網頁上手動點擊測試
+  # 🌟 移除 schedule，完全依賴外部 API 觸發
+  workflow_dispatch: # 這是接收外部指令的唯一入口
 
 permissions:
   contents: write
@@ -41,9 +39,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "GitHub Actions Bot"
           git pull origin main
-          
-          # 只把圖片加入
           git add weather.png
-          
-          # 🌟 關鍵：Git 會自動比對。如果圖片一模一樣，這行就不會 Commit；如果圖片變了，才會 Commit
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]" && git push)
