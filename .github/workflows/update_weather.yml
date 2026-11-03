@@ -1,8 +1,8 @@
 name: Update MMC Weather Image
 
 on:
-  # 🌟 移除 schedule，完全依賴外部 API 觸發
-  workflow_dispatch: # 這是接收外部指令的唯一入口
+  # 🌟 移除 GitHub 原生的 schedule，完全交由 cron-job.org 準時觸發
+  workflow_dispatch: 
 
 permissions:
   contents: write
@@ -38,6 +38,13 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "GitHub Actions Bot"
-          git pull origin main
+          
+          # 1. 先把新畫好的圖片加入並提交
           git add weather.png
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]")
+          
+          # 2. 再拉取遠端代碼，如果圖片有衝突，以本地剛畫好的為主 (-X ours)
+          git pull origin main -X ours
+          
+          # 3. 推送到 GitHub
+          git push origin main
