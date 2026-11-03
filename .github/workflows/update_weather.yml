@@ -2,8 +2,8 @@ name: Update MMC Weather Image
 
 on:
   schedule:
-    # 每小時的第 0 分鐘執行
-    - cron: '0 * * * *'
+    # 🌟 改為每 15 分鐘執行一次 (避開整點高峰，也解決 GitHub 定時器延遲問題)
+    - cron: '*/15 * * * *'
   workflow_dispatch: # 讓你能在網頁上手動點擊測試
 
 permissions:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10 # 🌟 新增：如果卡住超過 10 分鐘就自動放棄，避免浪費額度
+    timeout-minutes: 10 # 如果卡住超過 10 分鐘就自動放棄，避免浪費額度
 
     steps:
       - name: 檢出代碼 (Checkout)
@@ -43,6 +43,9 @@ jobs:
           git config --local user.name "GitHub Actions Bot"
           # 先拉取最新代碼，防止衝突
           git pull origin main
-          git add weather.png
+          
+          # 🌟 關鍵修改：把圖片和記錄時間的備忘錄一起加入提交
+          git add weather.png last_valid_for.txt
+          
           # 加上 [skip ci] 避免觸發其他 Workflow
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]" && git push)
