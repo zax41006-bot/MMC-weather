@@ -228,13 +228,15 @@ def plot_precipitation(ax):
 
 
 if __name__ == "__main__":
-    fig, axes = plt.subplots(4, 1, figsize=(15, 24))
+    # 🌟 修改這裡：改為 2x2 佈局，並調整畫布大小為 18x14
+    fig, axes = plt.subplots(2, 2, figsize=(18, 14))
     fig.patch.set_facecolor('white')
     
-    plot_temperature(axes[0])
-    plot_wind(axes[1])
-    plot_humidity(axes[2])
-    plot_precipitation(axes[3])
+    # 🌟 分別傳入對應的 axes 位置
+    plot_temperature(axes[0, 0])
+    plot_wind(axes[0, 1])
+    plot_humidity(axes[1, 0])
+    plot_precipitation(axes[1, 1])
     
     plt.tight_layout()
     
