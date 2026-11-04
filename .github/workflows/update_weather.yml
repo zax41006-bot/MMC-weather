@@ -1,7 +1,6 @@
 name: Update MMC Weather Image
 
 on:
-  # 🌟 移除 GitHub 原生的 schedule，完全交由 cron-job.org 準時觸發
   workflow_dispatch: 
 
 permissions:
@@ -10,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15 # 稍微拉長一點時間，因為要跑兩個腳本
 
     steps:
       - name: 檢出代碼 (Checkout)
@@ -31,20 +30,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt --index-url https://pypi.tuna.tsinghua.edu.cn/simple/
 
-      - name: 執行 real-time.py 生成天氣圖片
+      - name: 執行 real-time.py 生成實時簡報
         run: python real-time.py
+
+      - name: 執行 forecast48h.py 生成 48 小時預報
+        run: python forecast48h.py
 
       - name: 提交並推送圖片回 GitHub
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "GitHub Actions Bot"
-          
-          # 1. 先把新畫好的圖片加入並提交
-          git add weather.png
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather image [skip ci]")
-          
-          # 2. 再拉取遠端代碼，如果圖片有衝突，以本地剛畫好的為主 (-X ours)
           git pull origin main -X ours
           
-          # 3. 推送到 GitHub
-          git push origin main
+          # 🌟 把兩張圖片都加入
+          git add weather.png forecast48h.png
+          
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update weather images [skip ci]" && git push)
