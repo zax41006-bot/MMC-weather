@@ -1,0 +1,41 @@
+name: Update 15-Day Forecast
+
+on:
+  schedule:
+    # 澳門時間 05:15 (UTC 前一日 21:15) - 錯開整點避免塞車
+    - cron: '15 21 * * *'
+    # 澳門時間 17:15 (UTC 09:15)
+    - cron: '15 9 * * *'
+  workflow_dispatch: # 允許你在 GitHub 網頁上手動點擊運行測試
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 賦予寫入權限，才能把圖片 commit 回去
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # 使用穩定的 Python 版本
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # 確保安裝了所有需要的庫 (你可以改成 pip install -r requirements.txt 如果你已經寫好了)
+          pip install requests pandas numpy matplotlib scipy
+
+      - name: Run 15-day forecast script
+        run: python forecast15d.py # 執行你的 15 天預報腳本
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add forecast15d.png # 只提交這張生成的圖片
+          # 檢查是否有變動，如果有才 commit 和 push
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update 15-day forecast image [skip ci]" && git pull --rebase && git push)
