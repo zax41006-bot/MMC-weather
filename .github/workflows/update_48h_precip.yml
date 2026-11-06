@@ -2,11 +2,11 @@ name: Update 48h Precipitation Maps
 
 on:
   schedule:
-    # UTC 21:15 (Macau Time 05:15) - Triggers 12Z
+    # 澳門時間 05:15 (UTC 21:15) - 觸發 12Z
     - cron: '15 21 * * *'
-    # UTC 09:15 (Macau Time 17:15) - Triggers 00Z
+    # 澳門時間 17:15 (UTC 09:15) - 觸發 00Z
     - cron: '15 9 * * *'
-  workflow_dispatch: # Allow manual trigger from the Actions tab
+  workflow_dispatch: # 允許手動測試
 
 jobs:
   build-and-update:
@@ -40,6 +40,16 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          git add precip_48h_*.png
-          
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update 48h precipitation maps [skip ci]" && git pull --rebase && git push)
+          # 檢查是否有生成任何圖片
+          if ls precip_48h_*.png 1> /dev/null 2>&1; then
+              git add precip_48h_*.png
+              if git diff --staged --quiet; then
+                  echo "No changes in images to commit."
+              else
+                  git commit -m "Auto-update 48h precipitation maps [skip ci]"
+                  git pull --rebase
+                  git push
+              fi
+          else
+              echo "No images were generated. Skipping commit step."
+          fi
