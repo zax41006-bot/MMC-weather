@@ -8,37 +8,31 @@ from scipy.ndimage import gaussian_filter
 import matplotlib.colors as mcolors
 import warnings
 import os
+import shutil
+from datetime import datetime, timezone, timedelta # 新增時間模組
 
 warnings.filterwarnings('ignore')
 
 # ==========================================
-# 1. 自動尋找系統中文字體 (解決方塊字)
+# 1. 自動尋找系統中文字體
 # ==========================================
-# 清除 matplotlib 的字體緩存 (在 GitHub Actions 中很重要)
 cache_dir = os.path.expanduser('~/.cache/matplotlib')
 if os.path.exists(cache_dir):
-    import shutil
     try:
         shutil.rmtree(cache_dir)
     except:
         pass
 
-# 尋找系統中支援中文的字體
 font_files = fm.findSystemFonts(fontpaths=None, fontext='ttf')
-chinese_fonts = []
-for font_file in font_files:
-    if 'wqy' in font_file.lower() or 'yahei' in font_file.lower() or 'simhei' in font_file.lower():
-        chinese_fonts.append(font_file)
+chinese_fonts = [f for f in font_files if 'wqy' in f.lower() or 'yahei' in f.lower()]
 
 if chinese_fonts:
-    # 如果有找到中文字體，直接加到 matplotlib 裡
     for font in chinese_fonts:
         fm.fontManager.addfont(font)
     plt.rcParams['font.sans-serif'] = [fm.FontProperties(fname=chinese_fonts[0]).get_name()]
 else:
-    # 如果沒找到，退回預設設定
     plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'Microsoft YaHei', 'SimHei']
-    
+
 plt.rcParams['axes.unicode_minus'] = False
 
 STATION_NAME = "澳門全域"
@@ -109,9 +103,6 @@ def get_final_single_line_forecast():
     
     det_mean = np.nanmean(all_det_values, axis=0)
 
-    # ==========================================
-    # 2. 計算概率分布
-    # ==========================================
     min_temp = np.nanmin(ens_values) - 1
     max_temp = np.nanmax(ens_values) + 1
     
@@ -132,14 +123,19 @@ def get_final_single_line_forecast():
     threshold = np.max(prob_matrix_smooth) * 0.01
     prob_matrix_smooth[prob_matrix_smooth < threshold] = np.nan
     
-    # 將機率轉換為 0-100%
     prob_matrix_smooth = (prob_matrix_smooth / np.nanmax(prob_matrix_smooth)) * 100
-
     ens_mean = np.nanmean(ens_values, axis=1)
 
     # ==========================================
-    # 3. 繪圖
+    # 2. 獲取時間資訊
     # ==========================================
+    # 獲取澳門時區 (UTC+8) 的當前時間
+    macau_tz = timezone(timedelta(hours=8))
+    update_time = datetime.now(macau_tz).strftime('%Y-%m-%d %H:%M')
+    # 數據初始時間 (取時間軸的第一個小時)
+    init_time = x_dates[0].strftime('%Y-%m-%d %H:%M')
+
+    # 繪圖
     fig, ax = plt.subplots(figsize=(16, 7))
     ax.set_facecolor('white') 
 
@@ -151,9 +147,6 @@ def get_final_single_line_forecast():
 
     ax.plot(x_dates, ens_mean, color='gray', linewidth=2.5, linestyle='--', zorder=3, label='全域平均預報 (Mean)')
 
-    # ==========================================
-    # 4. 添加底部圖例 (Colorbar)
-    # ==========================================
     cb = fig.colorbar(cf, ax=ax, orientation='horizontal', pad=0.12, aspect=45)
     cb.set_ticks([0, 20, 40, 60, 80, 100])
     cb.set_ticklabels(['0%', '20%', '40%', '60%', '80%', '100%'])
@@ -161,10 +154,17 @@ def get_final_single_line_forecast():
     cb.outline.set_linewidth(1.5)
     cb.set_label('氣溫概率分佈', fontsize=14, weight='bold', labelpad=15)
 
+    # 繪製標題
+    ax.set_title(f'{STATION_NAME} — 未來 15 天氣溫概率與平均預報', fontsize=18, pad=35) # pad 加大，為下方文字留空間
+    
     # ==========================================
-    # 5. 美化軸線與文字
+    # 3. 加入更新時間文字
     # ==========================================
-    ax.set_title(f'{STATION_NAME} — 未來 15 天氣溫概率與平均預報', fontsize=18, pad=20)
+    # 在標題下方、圖表正上方加入時間資訊
+    time_text = f"數據初始時間: {init_time} (澳門時間) | 圖表更新時間: {update_time}"
+    ax.text(0.5, 1.02, time_text, transform=ax.transAxes, 
+            ha='center', va='bottom', fontsize=11, color='#555555')
+
     ax.set_ylabel('氣溫 (°C)', fontsize=14)
     ax.set_ylim(min_temp, max_temp)
 
