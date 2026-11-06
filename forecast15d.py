@@ -3,18 +3,45 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.font_manager as fm
 from scipy.ndimage import gaussian_filter
 import matplotlib.colors as mcolors
 import warnings
+import os
 
 warnings.filterwarnings('ignore')
 
-# 設定字體 (如果是 Linux 環境，會抓到文泉驛；如果是 Windows 會抓微軟雅黑)
-plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'Microsoft YaHei', 'SimHei', 'PingFang SC']
+# ==========================================
+# 1. 自動尋找系統中文字體 (解決方塊字)
+# ==========================================
+# 清除 matplotlib 的字體緩存 (在 GitHub Actions 中很重要)
+cache_dir = os.path.expanduser('~/.cache/matplotlib')
+if os.path.exists(cache_dir):
+    import shutil
+    try:
+        shutil.rmtree(cache_dir)
+    except:
+        pass
+
+# 尋找系統中支援中文的字體
+font_files = fm.findSystemFonts(fontpaths=None, fontext='ttf')
+chinese_fonts = []
+for font_file in font_files:
+    if 'wqy' in font_file.lower() or 'yahei' in font_file.lower() or 'simhei' in font_file.lower():
+        chinese_fonts.append(font_file)
+
+if chinese_fonts:
+    # 如果有找到中文字體，直接加到 matplotlib 裡
+    for font in chinese_fonts:
+        fm.fontManager.addfont(font)
+    plt.rcParams['font.sans-serif'] = [fm.FontProperties(fname=chinese_fonts[0]).get_name()]
+else:
+    # 如果沒找到，退回預設設定
+    plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'Microsoft YaHei', 'SimHei']
+    
 plt.rcParams['axes.unicode_minus'] = False
 
 STATION_NAME = "澳門全域"
-# 澳門 3x3 網格座標
 LATS = [22.13, 22.13, 22.13, 22.16, 22.16, 22.16, 22.19, 22.19, 22.19]
 LONS = [113.53, 113.56, 113.59, 113.53, 113.56, 113.59, 113.53, 113.56, 113.59]
 LAT_STR, LON_STR = ",".join(map(str, LATS)), ",".join(map(str, LONS))
@@ -51,9 +78,6 @@ def get_final_single_line_forecast():
         print(f"❌ 請求失敗: {e}")
         return
 
-    # ==========================================
-    # 1. 提取集合成員並合併為 Numpy 陣列
-    # ==========================================
     if isinstance(res_ens, dict): res_ens = [res_ens]
     if isinstance(res_det, dict): res_det = [res_det]
 
@@ -108,7 +132,7 @@ def get_final_single_line_forecast():
     threshold = np.max(prob_matrix_smooth) * 0.01
     prob_matrix_smooth[prob_matrix_smooth < threshold] = np.nan
     
-    # 【關鍵修改】將機率密度等比例放大，使最大值為 100 (代表 100% 概率)
+    # 將機率轉換為 0-100%
     prob_matrix_smooth = (prob_matrix_smooth / np.nanmax(prob_matrix_smooth)) * 100
 
     ens_mean = np.nanmean(ens_values, axis=1)
@@ -122,8 +146,7 @@ def get_final_single_line_forecast():
     colors_list = ['#FFFFFF', '#0000FF', '#00FFFF', '#00FF00', '#FFFF00', '#FFA500', '#FF0000']
     cmap = mcolors.LinearSegmentedColormap.from_list("custom_prob", colors_list, N=256)
 
-    # 統一設定 levels 為 0 到 100
-    levels = np.linspace(0, 100, 21) # 劃分 20 個色階，每階 5%
+    levels = np.linspace(0, 100, 21) 
     cf = ax.contourf(x_dates, temp_centers, prob_matrix_smooth, levels=levels, cmap=cmap, zorder=1, extend='max')
 
     ax.plot(x_dates, ens_mean, color='gray', linewidth=2.5, linestyle='--', zorder=3, label='全域平均預報 (Mean)')
@@ -131,17 +154,10 @@ def get_final_single_line_forecast():
     # ==========================================
     # 4. 添加底部圖例 (Colorbar)
     # ==========================================
-    # 使用 orientation='horizontal' 橫向放置，pad 控制與圖表的距離
     cb = fig.colorbar(cf, ax=ax, orientation='horizontal', pad=0.12, aspect=45)
-    
-    # 設定數字刻度
     cb.set_ticks([0, 20, 40, 60, 80, 100])
     cb.set_ticklabels(['0%', '20%', '40%', '60%', '80%', '100%'])
-    
-    # 隱藏刻度線，調整文字大小
     cb.ax.tick_params(length=0, labelsize=12, pad=8)
-    
-    # 設定色條外框與標題
     cb.outline.set_linewidth(1.5)
     cb.set_label('氣溫概率分佈', fontsize=14, weight='bold', labelpad=15)
 
@@ -167,10 +183,8 @@ def get_final_single_line_forecast():
     ax.grid(axis='y', linestyle='-', color='lightgray', alpha=0.7, zorder=0)
     ax.legend(loc='upper left', fontsize=12, frameon=True)
 
-    # 調整排版以容納底部的圖例
     plt.tight_layout()
     
-    # 保存圖片
     output_filename = 'forecast15d.png'
     plt.savefig(output_filename, dpi=150, bbox_inches='tight')
     print(f"✅ 圖片已成功保存為 {output_filename}")
