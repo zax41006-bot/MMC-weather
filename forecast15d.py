@@ -9,7 +9,7 @@ import matplotlib.colors as mcolors
 import warnings
 import os
 import shutil
-from datetime import datetime, timezone, timedelta # 新增時間模組
+from datetime import datetime, timezone, timedelta
 
 warnings.filterwarnings('ignore')
 
@@ -129,10 +129,8 @@ def get_final_single_line_forecast():
     # ==========================================
     # 2. 獲取時間資訊
     # ==========================================
-    # 獲取澳門時區 (UTC+8) 的當前時間
     macau_tz = timezone(timedelta(hours=8))
     update_time = datetime.now(macau_tz).strftime('%Y-%m-%d %H:%M')
-    # 數據初始時間 (取時間軸的第一個小時)
     init_time = x_dates[0].strftime('%Y-%m-%d %H:%M')
 
     # 繪圖
@@ -152,18 +150,15 @@ def get_final_single_line_forecast():
     cb.set_ticklabels(['0%', '20%', '40%', '60%', '80%', '100%'])
     cb.ax.tick_params(length=0, labelsize=12, pad=8)
     cb.outline.set_linewidth(1.5)
-    cb.set_label('氣溫概率分佈', fontsize=14, weight='bold', labelpad=15)
-
-    # 繪製標題
-    ax.set_title(f'{STATION_NAME} — 未來 15 天氣溫概率與平均預報', fontsize=18, pad=35) # pad 加大，為下方文字留空間
     
     # ==========================================
-    # 3. 加入更新時間文字
+    # 3. 直接把更新時間與圖例文字結合寫在這裡
     # ==========================================
-    # 在標題下方、圖表正上方加入時間資訊
-    time_text = f"數據初始時間: {init_time} (澳門時間) | 圖表更新時間: {update_time}"
-    ax.text(0.5, 1.02, time_text, transform=ax.transAxes, 
-            ha='center', va='bottom', fontsize=11, color='#555555')
+    # 使用 \n 換行，讓標題與時間分行顯示在色條正下方
+    legend_text = f'氣溫概率分佈\n(數據初始: {init_time} | 更新: {update_time})'
+    cb.set_label(legend_text, fontsize=13, weight='bold', labelpad=15)
+
+    ax.set_title(f'{STATION_NAME} — 未來 15 天氣溫概率與平均預報', fontsize=18, pad=20)
 
     ax.set_ylabel('氣溫 (°C)', fontsize=14)
     ax.set_ylim(min_temp, max_temp)
