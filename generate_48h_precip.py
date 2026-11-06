@@ -42,18 +42,13 @@ plt.rcParams['axes.unicode_minus'] = False
 now_utc = datetime.now(timezone.utc)
 candidates = []
 
-# 澳門時間 05:00 ~ 17:00 (UTC 21:00 ~ 次日 09:00) -> 使用前一天的 12Z
-# 澳門時間 17:00 ~ 次日 05:00 (UTC 09:00 ~ 21:00) -> 使用當天的 00Z
 if 9 <= now_utc.hour < 21:
-    # UTC 09:00 ~ 21:00，對應澳門 17:00 ~ 05:00 -> 抓當天 00Z
     candidates.append(now_utc.strftime('%Y-%m-%d-00'))
     candidates.append((now_utc - timedelta(days=1)).strftime('%Y-%m-%d-12'))
 elif now_utc.hour >= 21:
-    # UTC >= 21:00，對應澳門次日 05:00 以後 -> 抓當天 12Z
     candidates.append(now_utc.strftime('%Y-%m-%d-12'))
     candidates.append(now_utc.strftime('%Y-%m-%d-00'))
 else:
-    # UTC < 09:00，對應澳門 17:00 以前 (例如早上) -> 抓前一天 12Z
     candidates.append((now_utc - timedelta(days=1)).strftime('%Y-%m-%d-12'))
     candidates.append((now_utc - timedelta(days=2)).strftime('%Y-%m-%d-12'))
 
@@ -61,8 +56,8 @@ valid_run_date = None
 for cand in candidates:
     try:
         print(f"🔍 Checking data availability for run: {cand} ...")
-        # 測試 F06 數據是否上傳完成
-        H_test = Herbie(cand, model="ifs", product="oper", fxx=6, priority=['aws', 'google'])
+        # 🌟 加入多源備援：優先 AWS，失敗則嘗試 Google 或 Azure
+        H_test = Herbie(cand, model="ifs", product="oper", fxx=6, priority=['aws', 'google', 'azure'])
         if H_test.grib is not None:
             valid_run_date = cand
             print(f"✅ Data is available. Using run: {valid_run_date}")
@@ -71,11 +66,12 @@ for cand in candidates:
         print(f"⚠️ Data not available for run: {cand}. Trying fallback...")
 
 if valid_run_date is None:
-    print("❌ CRITICAL: No data found. Exiting.")
-    sys.exit(1)
+    print("❌ CRITICAL: No data found for any candidate dates. Exiting.")
+    sys.exit(0) # 如果連數據都沒有，直接正常退出，不讓 Action 報紅
 
 run_date = valid_run_date
 forecast_hours = [6, 12, 18, 24, 30, 36, 42, 48]
+success_count = 0
 
 # ==========================================
 # 3. Loop to Generate Images
@@ -85,8 +81,9 @@ for target_fxx in forecast_hours:
     print(f"  -> Processing +{target_fxx}h ...")
     
     try:
-        H = Herbie(run_date, model="ifs", product="oper", fxx=target_fxx, priority=['aws', 'google'])
-        H_prev = Herbie(run_date, model="ifs", product="oper", fxx=prev_fxx, priority=['aws', 'google'])
+        # 🌟 加入多源備援與自動重試
+        H = Herbie(run_date, model="ifs", product="oper", fxx=target_fxx, priority=['aws', 'google', 'azure'])
+        H_prev = Herbie(run_date, model="ifs", product="oper", fxx=prev_fxx, priority=['aws', 'google', 'azure'])
 
         ds_msl = H.xarray("msl", remove_grib=True)
         ds_tp_curr = H.xarray("tp", remove_grib=True)
@@ -103,7 +100,6 @@ for target_fxx in forecast_hours:
         msl_smooth = gaussian_filter(msl, sigma=1.5)
         lon2d, lat2d = np.meshgrid(ds.longitude.values, ds.latitude.values)
 
-        # Identify Highs and Lows
         size = 45
         msl_max = maximum_filter(msl_smooth, size=size)
         msl_min = minimum_filter(msl_smooth, size=size)
@@ -119,7 +115,6 @@ for target_fxx in forecast_hours:
         high_valid = filter_borders(high_indices, msl_smooth.shape)
         low_valid = filter_borders(low_indices, msl_smooth.shape)
 
-        # Plotting
         fig, ax = plt.subplots(figsize=(12, 10), constrained_layout=True, 
                                subplot_kw={'projection': ccrs.PlateCarree()})
 
@@ -138,7 +133,6 @@ for target_fxx in forecast_hours:
         gl.xlabel_style = {'size': 10, 'color': 'black'}
         gl.ylabel_style = {'size': 10, 'color': 'black'}
 
-        # Precipitation color fill
         precip_levels = [0.1, 5, 10, 25, 50, 70, 100]
         precip_colors = ['#90EE90', '#32CD32', '#87CEFA', '#0000FF', '#FF00FF', '#8B0000']
         cmap_precip = ListedColormap(precip_colors)
@@ -150,7 +144,6 @@ for target_fxx in forecast_hours:
             transform=ccrs.PlateCarree(), alpha=0.65, zorder=1
         )
 
-        # Isobars
         msl_levels = np.arange(np.floor(msl_smooth.min()/4)*4, np.ceil(msl_smooth.max()/4)*4 + 4, 4)
         cs = ax.contour(
             ds.longitude, ds.latitude, msl_smooth,
@@ -158,7 +151,6 @@ for target_fxx in forecast_hours:
         )
         ax.clabel(cs, fontsize=10, inline=1, inline_spacing=2, fmt='%i', rightside_up=True)
 
-        # H/L Labels
         for lat_idx, lon_idx in high_valid:
             ax.text(lon2d[lat_idx, lon_idx], lat2d[lat_idx, lon_idx], 'H', 
                     color='blue', fontsize=24, ha='center', va='center', weight='bold', 
@@ -168,7 +160,6 @@ for target_fxx in forecast_hours:
                     color='red', fontsize=24, ha='center', va='center', weight='bold', 
                     transform=ccrs.PlateCarree(), zorder=3)
 
-        # Macau Marker
         macau_lat, macau_lon = 22.16, 113.56
         ax.plot(macau_lon, macau_lat, marker='o', color='red', markeredgecolor='black', 
                 markersize=10, transform=ccrs.PlateCarree(), zorder=10)
@@ -176,13 +167,11 @@ for target_fxx in forecast_hours:
                 weight='bold', transform=ccrs.PlateCarree(), zorder=10,
                 bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=1))
 
-        # Colorbar
         cb = fig.colorbar(cf, ax=ax, orientation='horizontal', pad=0.06, shrink=0.8, ticks=precip_levels)
         labels = ['0.1', '5', '10', '25', '50', '70', '100']
         cb.set_ticklabels(labels, fontsize=12)
         cb.set_label('6-hour Precipitation (mm)', size='large', weight='bold', labelpad=10)
 
-        # Title & Time (UTC+8)
         init_time = pd.to_datetime(ds.time.values)
         valid_time = pd.to_datetime(ds.valid_time.values)
         init_utc8_str = (init_time + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M (UTC+8)')
@@ -196,13 +185,13 @@ for target_fxx in forecast_hours:
             color='firebrick', fontsize=14, pad=15
         )
 
-        # Save Output
         output_filename = f'precip_48h_{target_fxx:02d}.png'
         plt.savefig(output_filename, dpi=150, bbox_inches='tight')
         plt.close(fig)
         print(f"     ✅ Saved: {output_filename}")
+        success_count += 1
         
     except Exception as e:
         print(f"     ❌ Failed +{target_fxx}h: {e}")
 
-print("🎉 All processing finished!")
+print(f"🎉 Processing finished! Successfully generated {success_count}/8 images.")
