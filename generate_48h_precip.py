@@ -12,13 +12,14 @@ import warnings
 import matplotlib.font_manager as fm
 import os
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import sys
 
 # Ignore warnings
 warnings.filterwarnings('ignore')
 
 # ==========================================
-# 1. Font Setup (Prevent missing glyphs in Linux/GitHub Actions)
+# 1. Font Setup
 # ==========================================
 cache_dir = os.path.expanduser('~/.cache/matplotlib')
 if os.path.exists(cache_dir):
@@ -36,18 +37,44 @@ else:
 plt.rcParams['axes.unicode_minus'] = False
 
 # ==========================================
-# 2. Time Logic
+# 2. Time Logic (Macau Time -> Correct UTC Run)
 # ==========================================
 now_utc = datetime.now(timezone.utc)
-# UTC >= 12 (Macau Time >= 20:00, including 05:00) -> Use today's 12Z
-# UTC < 12 (Macau Time < 20:00, including 17:00) -> Use today's 00Z
-if now_utc.hour >= 12:
-    run_date = now_utc.strftime('%Y-%m-%d-12')
+candidates = []
+
+# 澳門時間 05:00 ~ 17:00 (UTC 21:00 ~ 次日 09:00) -> 使用前一天的 12Z
+# 澳門時間 17:00 ~ 次日 05:00 (UTC 09:00 ~ 21:00) -> 使用當天的 00Z
+if 9 <= now_utc.hour < 21:
+    # UTC 09:00 ~ 21:00，對應澳門 17:00 ~ 05:00 -> 抓當天 00Z
+    candidates.append(now_utc.strftime('%Y-%m-%d-00'))
+    candidates.append((now_utc - timedelta(days=1)).strftime('%Y-%m-%d-12'))
+elif now_utc.hour >= 21:
+    # UTC >= 21:00，對應澳門次日 05:00 以後 -> 抓當天 12Z
+    candidates.append(now_utc.strftime('%Y-%m-%d-12'))
+    candidates.append(now_utc.strftime('%Y-%m-%d-00'))
 else:
-    run_date = now_utc.strftime('%Y-%m-%d-00')
+    # UTC < 09:00，對應澳門 17:00 以前 (例如早上) -> 抓前一天 12Z
+    candidates.append((now_utc - timedelta(days=1)).strftime('%Y-%m-%d-12'))
+    candidates.append((now_utc - timedelta(days=2)).strftime('%Y-%m-%d-12'))
 
-print(f"Starting 48h precipitation forecast generation for run: {run_date}")
+valid_run_date = None
+for cand in candidates:
+    try:
+        print(f"🔍 Checking data availability for run: {cand} ...")
+        # 測試 F06 數據是否上傳完成
+        H_test = Herbie(cand, model="ifs", product="oper", fxx=6, priority=['aws', 'google'])
+        if H_test.grib is not None:
+            valid_run_date = cand
+            print(f"✅ Data is available. Using run: {valid_run_date}")
+            break
+    except Exception as e:
+        print(f"⚠️ Data not available for run: {cand}. Trying fallback...")
 
+if valid_run_date is None:
+    print("❌ CRITICAL: No data found. Exiting.")
+    sys.exit(1)
+
+run_date = valid_run_date
 forecast_hours = [6, 12, 18, 24, 30, 36, 42, 48]
 
 # ==========================================
@@ -58,12 +85,12 @@ for target_fxx in forecast_hours:
     print(f"  -> Processing +{target_fxx}h ...")
     
     try:
-        H = Herbie(run_date, model="ifs", product="oper", fxx=target_fxx)
-        H_prev = Herbie(run_date, model="ifs", product="oper", fxx=prev_fxx)
+        H = Herbie(run_date, model="ifs", product="oper", fxx=target_fxx, priority=['aws', 'google'])
+        H_prev = Herbie(run_date, model="ifs", product="oper", fxx=prev_fxx, priority=['aws', 'google'])
 
-        ds_msl = H.xarray("msl")
-        ds_tp_curr = H.xarray("tp")
-        ds_tp_prev = H_prev.xarray("tp")
+        ds_msl = H.xarray("msl", remove_grib=True)
+        ds_tp_curr = H.xarray("tp", remove_grib=True)
+        ds_tp_prev = H_prev.xarray("tp", remove_grib=True)
 
         ds = ds_msl.sel(latitude=slice(45, 5), longitude=slice(95, 145))
         ds_tp_curr = ds_tp_curr.sel(latitude=slice(45, 5), longitude=slice(95, 145))
@@ -178,4 +205,4 @@ for target_fxx in forecast_hours:
     except Exception as e:
         print(f"     ❌ Failed +{target_fxx}h: {e}")
 
-print("🎉 All images generated successfully!")
+print("🎉 All processing finished!")
