@@ -35,7 +35,7 @@ else:
 
 plt.rcParams['axes.unicode_minus'] = False
 
-STATION_NAME = "澳門全域"
+STATION_NAME = "澳門"
 LATS = [22.13, 22.13, 22.13, 22.16, 22.16, 22.16, 22.19, 22.19, 22.19]
 LONS = [113.53, 113.56, 113.59, 113.53, 113.56, 113.59, 113.53, 113.56, 113.59]
 LAT_STR, LON_STR = ",".join(map(str, LATS)), ",".join(map(str, LONS))
@@ -143,7 +143,7 @@ def get_final_single_line_forecast():
     levels = np.linspace(0, 100, 21) 
     cf = ax.contourf(x_dates, temp_centers, prob_matrix_smooth, levels=levels, cmap=cmap, zorder=1, extend='max')
 
-    ax.plot(x_dates, ens_mean, color='gray', linewidth=2.5, linestyle='--', zorder=3, label='全域平均預報 (Mean)')
+    ax.plot(x_dates, ens_mean, color='gray', linewidth=2.5, linestyle='--', zorder=3, label='平均預報 (Mean)')
 
     cb = fig.colorbar(cf, ax=ax, orientation='horizontal', pad=0.12, aspect=45)
     cb.set_ticks([0, 20, 40, 60, 80, 100])
