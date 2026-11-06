@@ -155,10 +155,10 @@ def get_final_single_line_forecast():
     # 3. 直接把更新時間與圖例文字結合寫在這裡
     # ==========================================
     # 使用 \n 換行，讓標題與時間分行顯示在色條正下方
-    legend_text = f'氣溫概率分佈\n(數據初始: {init_time} | 更新: {update_time})'
+    legend_text = f'氣溫預報概率分佈\n(數據初始: {init_time} | 更新: {update_time})'
     cb.set_label(legend_text, fontsize=13, weight='bold', labelpad=15)
 
-    ax.set_title(f'{STATION_NAME} — 未來 15 天氣溫概率與平均預報', fontsize=18, pad=20)
+    ax.set_title(f'{STATION_NAME} — 未來 15 天氣溫 概率預報', fontsize=18, pad=20)
 
     ax.set_ylabel('氣溫 (°C)', fontsize=14)
     ax.set_ylim(min_temp, max_temp)
