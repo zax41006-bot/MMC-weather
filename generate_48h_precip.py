@@ -186,8 +186,8 @@ for target_fxx in forecast_hours:
 
             init_time = pd.to_datetime(ds.time.values)
             valid_time = pd.to_datetime(ds.valid_time.values)
-            init_utc8_str = (init_time + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M (UTC+8)')
-            valid_utc8_str = (valid_time + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M (UTC+8)')
+            init_utc8_str = (init_time + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M ')
+            valid_utc8_str = (valid_time + pd.Timedelta(hours=8)).strftime('%Y-%m-%d %H:%M ')
 
             ax.set_title(
                 f"ECMWF IFS (0.25°): MSLP (hPa) & 6h Precipitation\n"
