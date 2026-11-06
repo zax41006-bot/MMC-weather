@@ -2,7 +2,7 @@ name: Update 15-Day Forecast
 
 on:
   schedule:
-    # 澳門時間 05:15 (UTC 前一日 21:15) - 錯開整點避免塞車
+    # 澳門時間 05:15 (UTC 前一日 21:15) - 錯開整點避免伺服器塞車
     - cron: '15 21 * * *'
     # 澳門時間 17:15 (UTC 09:15)
     - cron: '15 9 * * *'
@@ -11,8 +11,10 @@ on:
 jobs:
   build-and-update:
     runs-on: ubuntu-latest
+    
+    # 賦予寫入權限，才能將生成的圖片 commit 回倉庫
     permissions:
-      contents: write # 賦予寫入權限，才能把圖片 commit 回去
+      contents: write 
 
     steps:
       - name: Checkout repository
@@ -23,10 +25,14 @@ jobs:
         with:
           python-version: '3.10' # 使用穩定的 Python 版本
 
-      - name: Install dependencies
+      - name: Install dependencies and Chinese fonts
         run: |
+          # 更新 apt 並安裝文泉驛中文字體，解決圖片中文變方塊的問題
+          sudo apt-get update
+          sudo apt-get install -y fonts-wqy-zenhei
+          
+          # 安裝 Python 依賴包
           python -m pip install --upgrade pip
-          # 確保安裝了所有需要的庫 (你可以改成 pip install -r requirements.txt 如果你已經寫好了)
           pip install requests pandas numpy matplotlib scipy
 
       - name: Run 15-day forecast script
@@ -36,6 +42,10 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add forecast15d.png # 只提交這張生成的圖片
-          # 檢查是否有變動，如果有才 commit 和 push
+          
+          # 只將生成的圖片加入暫存區
+          git add forecast15d.png
+          
+          # 檢查是否有變動，如果有才進行 commit 和 push
+          # 加入 git pull --rebase 防止與其他 Action 的提交發生衝突
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update 15-day forecast image [skip ci]" && git pull --rebase && git push)
