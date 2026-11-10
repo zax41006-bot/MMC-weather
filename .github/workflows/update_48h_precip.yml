@@ -2,11 +2,16 @@ name: Update 48h Precipitation Maps
 
 on:
   schedule:
-    # 澳門時間 05:15 (UTC 21:15) - 觸發 12Z
+    # 澳門時間 05:15 (UTC 前一日 21:15) - 作為備用
     - cron: '15 21 * * *'
-    # 澳門時間 17:15 (UTC 09:15) - 觸發 00Z
+    # 澳門時間 17:15 (UTC 09:15) - 作為備用
     - cron: '15 9 * * *'
-  workflow_dispatch: # 允許手動測試
+  
+  # 🌟 新增：接收外部精準觸發（統一暗號）
+  repository_dispatch:
+    types: [trigger-all-forecast] 
+
+  workflow_dispatch: # 手動按鈕
 
 jobs:
   build-and-update:
@@ -28,28 +33,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-wqy-zenhei
           rm -rf ~/.cache/matplotlib
-          
           python -m pip install --upgrade pip
           pip install requests pandas numpy matplotlib scipy xarray herbie-data cfgrib eccodes cartopy
 
       - name: Run 48h precipitation script
-        run: python generate_48h_precip.py
+        run: python generate_48h_precip.py # 請確認這是你的 Python 檔名
 
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git add precip_48h_*.png || true
           
-          # 檢查是否有生成任何圖片
-          if ls precip_48h_*.png 1> /dev/null 2>&1; then
-              git add precip_48h_*.png
-              if git diff --staged --quiet; then
-                  echo "No changes in images to commit."
-              else
-                  git commit -m "Auto-update 48h precipitation maps [skip ci]"
-                  git pull --rebase
-                  git push
-              fi
+          if git diff --staged --quiet; then
+            echo "No new images generated to commit."
           else
-              echo "No images were generated. Skipping commit step."
+            git commit -m "Auto-update 48h precipitation maps [skip ci]"
+            git pull --rebase
+            git push
           fi
