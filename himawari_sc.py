@@ -15,7 +15,7 @@ import numpy as np
 from pyresample.geometry import AreaDefinition
 from satpy import Scene
 
-# ================= 設定區（MMC-weather 根目錄版） =================
+# ================= 設定區（自動生成專屬資料夾版） =================
 SOUTH_CHINA_BBOX = (105.0, 15.0, 122.0, 28.0)
 RES_DEG = 0.02
 MACAU_LON, MACAU_LAT = 113.55, 22.17
@@ -24,6 +24,8 @@ TARGET_PRODUCT = "B13"
 MINUTES_DELAY = 30
 RETENTION_HOURS = 6
 CLEANUP_OLD_HSD = True
+
+OUTPUT_DIR_NAME = "himawari9_sc"  # 圖片自動存進這個資料夾
 
 COASTLINE_COLOR = "#FFD400"
 BORDER_COLOR = "#FF7A00"
@@ -137,6 +139,7 @@ def add_10m_land_boundaries(ax, lon_min: float, lon_max: float, lat_min: float, 
 def run_auto_south_china_cloud_map() -> None:
     base_dir = Path(".")
     hsd_dir = base_dir / "hsd_data"
+    output_dir = base_dir / OUTPUT_DIR_NAME
 
     if CLEANUP_OLD_HSD:
         cleanup_expired_hsd_files(hsd_dir, retention_hours=RETENTION_HOURS)
@@ -212,7 +215,8 @@ def run_auto_south_china_cloud_map() -> None:
     ax.set_title(f"Himawari-9 Weather Satellite Imagery | {dt_cst:%H:%M} MST | [MMC]")
     plt.tight_layout()
 
-    out_path = base_dir / f"himawari9_sc_{TARGET_PRODUCT}.png"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / f"himawari9_sc_{TARGET_PRODUCT}.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     print(f"[完成] 已更新：{out_path}")
 
