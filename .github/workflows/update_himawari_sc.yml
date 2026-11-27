@@ -1,0 +1,55 @@
+name: Update Himawari-9 South China Cloud Map
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-himawari-sc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Cache 6-hour HSD data
+        uses: actions/cache@v4
+        with:
+          path: hsd_data
+          key: himawari9-hsd-6h-${{ github.run_id }}
+          restore-keys: |
+            himawari9-hsd-6h-
+
+      - name: Install system dependencies for Cartopy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgeos-dev libproj-dev proj-bin
+
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 satpy pyresample cartopy matplotlib numpy scipy dask
+
+      - name: Run Himawari-9 South China script
+        run: python himawari_sc.py
+
+      - name: Commit and push updated images
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.noreply.com"
+          git add himawari9_sc_*.png
+          if git diff --staged --quiet; then
+            echo "No new satellite images to commit."
+          else
+            git commit -m "Auto-update Himawari-9 satellite image [skip ci]"
+            git push
+          fi
