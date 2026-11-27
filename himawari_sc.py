@@ -15,7 +15,7 @@ import numpy as np
 from pyresample.geometry import AreaDefinition
 from satpy import Scene
 
-# ================= 設定區（自動生成專屬資料夾版） =================
+# ================= 設定區 =================
 SOUTH_CHINA_BBOX = (105.0, 15.0, 122.0, 28.0)
 RES_DEG = 0.02
 MACAU_LON, MACAU_LAT = 113.55, 22.17
@@ -24,8 +24,9 @@ TARGET_PRODUCT = "B13"
 MINUTES_DELAY = 30
 RETENTION_HOURS = 6
 CLEANUP_OLD_HSD = True
+CLEANUP_OLD_IMAGES = True
 
-OUTPUT_DIR_NAME = "himawari9_sc"  # 圖片自動存進這個資料夾
+OUTPUT_DIR_NAME = "himawari9_sc"
 
 COASTLINE_COLOR = "#FFD400"
 BORDER_COLOR = "#FF7A00"
@@ -78,6 +79,15 @@ def cleanup_expired_hsd_files(hsd_dir: Path, retention_hours: int = 6) -> None:
         return
     cutoff_ts = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).timestamp()
     for p in hsd_dir.iterdir():
+        if p.is_file() and p.stat().st_mtime < cutoff_ts:
+            p.unlink(missing_ok=True)
+
+
+def cleanup_old_images(img_dir: Path, retention_hours: int = 6) -> None:
+    if not img_dir.exists():
+        return
+    cutoff_ts = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).timestamp()
+    for p in img_dir.glob("himawari9_sc_*.png"):
         if p.is_file() and p.stat().st_mtime < cutoff_ts:
             p.unlink(missing_ok=True)
 
@@ -168,7 +178,7 @@ def run_auto_south_china_cloud_map() -> None:
     arr = data_da.values
 
     lon_min, lat_min, lon_max, lat_max = SOUTH_CHINA_BBOX
-    dt_cst = used_dt + timedelta(hours=8)
+    dt_mst = used_dt + timedelta(hours=8)
     data_crs = ccrs.PlateCarree()
 
     fig = plt.figure(figsize=(8.5, 7.5))
@@ -212,13 +222,20 @@ def run_auto_south_china_cloud_map() -> None:
     )
     ax.legend(loc="upper left", framealpha=0.85)
 
-    ax.set_title(f"Himawari-9 Weather Satellite Imagery | {dt_cst:%H:%M} MST | [MMC]")
+    mmdd = dt_mst.strftime("%m-%d")
+    hhmm_mst = dt_mst.strftime("%H%M")
+    hh_colon_mm_mst = dt_mst.strftime("%H:%M")
+
+    ax.set_title(f"{mmdd} {hh_colon_mm_mst} MST")
     plt.tight_layout()
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"himawari9_sc_{TARGET_PRODUCT}.png"
+    out_path = output_dir / f"himawari9_sc_{TARGET_PRODUCT}_{mmdd}_{hhmm_mst}.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     print(f"[完成] 已更新：{out_path}")
+
+    if CLEANUP_OLD_IMAGES:
+        cleanup_old_images(output_dir, retention_hours=RETENTION_HOURS)
 
     plt.show()
     plt.close(fig)
