@@ -226,7 +226,7 @@ def run_auto_south_china_cloud_map() -> None:
     hhmm_mst = dt_mst.strftime("%H%M")
     hh_colon_mm_mst = dt_mst.strftime("%H:%M")
 
-    ax.set_title(f"{mmdd} {hh_colon_mm_mst} MST")
+    ax.set_title(f"Himawari-9 Weather Satellite Imagery | {mmdd} {hh_colon_mm_mst} MST | [MMC]")
     plt.tight_layout()
 
     output_dir.mkdir(parents=True, exist_ok=True)
